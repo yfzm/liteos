@@ -52,7 +52,8 @@
 #include <stm32l4xx_it.h>
 
 #define cn_endpoint_id        "SDK_LWM2M_NODTLS"
-#define cn_app_server         "49.4.85.232"
+// #define cn_app_server         "49.4.85.232"
+#define cn_app_server         "119.3.250.80"
 #define cn_app_port           "5683"
 
 #define cn_app_connectivity    0
@@ -108,6 +109,7 @@ int8_t key2 = 0;
 int16_t toggle = 0;
 int16_t lux;
 int8_t qr_code = 1;
+int8_t on_off = 0;
 extern const unsigned char gImage_Huawei_IoT_QR_Code[114720];
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
@@ -145,15 +147,39 @@ static void timer1_callback(void *arg)
 	{
 		POINT_COLOR = RED;
 		LCD_ShowString(40, 10, 200, 16, 24, "IoTCluB BearPi");
-		LCD_ShowString(15, 50, 210, 16, 24, "LiteOS NB-IoT Demo");
+		LCD_ShowString(15, 50, 210, 16, 24, "F**k, no signal");
 		LCD_ShowString(10, 100, 200, 16, 16, "NCDP_IP:");
 		LCD_ShowString(80, 100, 200, 16, 16, cn_app_server);
 		LCD_ShowString(10, 150, 200, 16, 16, "NCDP_PORT:");
 		LCD_ShowString(100, 150, 200, 16, 16, cn_app_port);
 		LCD_ShowString(10, 200, 200, 16, 16, "BH1750 Value is:");
 		LCD_ShowNum(140, 200, lux, 5, 16);
+        // HAL_GPIO_WritePin(Light_GPIO_Port,Light_Pin,GPIO_PIN_SET);
 	}
 }
+
+static void timer2_callback(void *arg)
+{
+	on_off = !on_off;
+	// LCD_Clear(WHITE);
+	if (on_off == 1)
+        HAL_GPIO_WritePin(Light_GPIO_Port,Light_Pin,GPIO_PIN_SET);
+		// LCD_Show_Image(0,0,240,239,gImage_Huawei_IoT_QR_Code);
+	else
+	{
+		// POINT_COLOR = RED;
+		// LCD_ShowString(40, 10, 200, 16, 24, "IoTCluB BearPi");
+		// LCD_ShowString(15, 50, 210, 16, 24, "F**k, no signal");
+		// LCD_ShowString(10, 100, 200, 16, 16, "NCDP_IP:");
+		// LCD_ShowString(80, 100, 200, 16, 16, cn_app_server);
+		// LCD_ShowString(10, 150, 200, 16, 16, "NCDP_PORT:");
+		// LCD_ShowString(100, 150, 200, 16, 16, cn_app_port);
+		// LCD_ShowString(10, 200, 200, 16, 16, "BH1750 Value is:");
+		// LCD_ShowNum(140, 200, lux, 5, 16);
+        HAL_GPIO_WritePin(Light_GPIO_Port,Light_Pin,GPIO_PIN_RESET);
+	}
+}
+
 
 //use this function to push all the message to the buffer
 static int app_msg_deal(void *usr_data,char *msg, int len)
@@ -328,6 +354,26 @@ static int app_collect_task_entry()
     return 0;
 }
 
+static int app_react_to_light()
+{
+    while(1) 
+    {
+        int light = (int)(lux);
+        printf("\r\n******************************Light Value is  %d\r\n",light);
+        if (light > 500)
+        {
+            printf("\r\n******************************Turn off light");
+            HAL_GPIO_WritePin(Light_GPIO_Port,Light_Pin,GPIO_PIN_RESET);
+        }
+        else if (light <= 50)
+        {
+            printf("\r\n******************************Turn on light");
+            HAL_GPIO_WritePin(Light_GPIO_Port,Light_Pin,GPIO_PIN_SET);
+        }
+        osal_task_sleep(1*1);
+    }
+    return 0;
+}
 
 #include <stimer.h>
 
@@ -338,11 +384,14 @@ int oc_lwm2m_demo_main()
     osal_task_create("app_collect",app_collect_task_entry,NULL,0x400,NULL,3);
     osal_task_create("app_report",app_report_task_entry,NULL,0x1000,NULL,2);
     osal_task_create("app_command",app_cmd_task_entry,NULL,0x1000,NULL,3);
+    // osal_task_create("app_react",app_react_to_light,NULL,0x1000,NULL,3);
 
     osal_int_connect(KEY1_EXTI_IRQn, 2,0,Key1_IRQHandler,NULL);
     osal_int_connect(KEY2_EXTI_IRQn, 3,0,Key2_IRQHandler,NULL);
 
     stimer_create("lcdtimer",timer1_callback,NULL,8*1000,cn_stimer_flag_start);
+
+    // stimer_create("lcdtimer2",timer2_callback,NULL,8*1000,cn_stimer_flag_start);
 
     return 0;
 }
